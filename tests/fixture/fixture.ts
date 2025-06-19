@@ -12,7 +12,7 @@ import {
   createSecretVaultUserClient,
   type SecretVaultUserClient,
 } from "#/secretvault/user-client";
-import { createTestLogger } from "./logger";
+import { createTestLogger } from "./utils";
 
 export type FixtureContext = {
   env: {

@@ -1,18 +1,17 @@
 import * as crypto from "node:crypto";
 import { faker } from "@faker-js/faker";
+import { NucTokenBuilder } from "@nillion/nuc";
 import { describe } from "vitest";
 import type { Uuid } from "#/common/types";
 import type { CreateCollectionRequest } from "#/nildb/dto/collections.dto";
-import collection from "./data/standard.collection.json";
-import query from "./data/standard.query.json";
+import { NucCmd } from "#/nildb/nuc-cmd";
+import collection from "./data/owned.collection.json";
+import query from "./data/owned.query.json";
 import { createFixture } from "./fixture/fixture";
 import { delay } from "./fixture/utils";
 
-describe("standard-data.test.ts", () => {
-  const { test, beforeAll, afterAll } = createFixture({
-    activateBuilderSubscription: true,
-    keepDbs: false,
-  });
+describe("owned-data.test.ts", () => {
+  const { test, beforeAll, afterAll } = createFixture();
 
   collection._id = crypto.randomUUID().toString() as Uuid;
   query._id = crypto.randomUUID().toString() as Uuid;
@@ -27,7 +26,7 @@ describe("standard-data.test.ts", () => {
   });
   afterAll(async (_c) => {});
 
-  test("create a standard collection", async ({ c }) => {
+  test("create owned collection", async ({ c }) => {
     const { builder, expect } = c;
 
     const _results = await builder.createCollection(
@@ -46,28 +45,37 @@ describe("standard-data.test.ts", () => {
     }
   });
 
-  test("upload data", async ({ c }) => {
-    const { builder, expect } = c;
+  test("user can upload data", async ({ c }) => {
+    const { builder, user, expect } = c;
 
-    const data = [
-      {
-        _id: crypto.randomUUID().toString(),
-        name: "tim",
-      },
-    ];
+    const delegation = NucTokenBuilder.extending(builder.rootToken)
+      .command(NucCmd.nil.db.data.create)
+      .audience(user.did)
+      .expiresAt(Date.now() + 1000 * 60)
+      .build(builder._options.keypair.privateKey());
 
-    const results = await builder.createData({
+    const result = await user.createData({
       body: {
+        owner: user.did.toString(),
+        acl: {
+          grantee: builder.did.toString(),
+          read: true,
+          write: false,
+          execute: true,
+        },
         collection: collection._id,
-        data,
+        data: [
+          {
+            _id: crypto.randomUUID().toString(),
+            name: "tim",
+          },
+        ],
       },
+      delegation,
     });
-    const pairs = Object.entries(results);
 
-    expect(Object.keys(results)).toHaveLength(2);
-    for (const [_, result] of pairs) {
-      expect(result.data.errors).toHaveLength(0);
-      expect(result.data.created.at(0)).toBe(data.at(0)?._id);
-    }
+    console.log(result);
+
+    expect(result).toBeDefined();
   });
 });
